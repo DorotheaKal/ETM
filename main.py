@@ -1,6 +1,8 @@
 #/usr/bin/python
 
 from __future__ import print_function
+from my_predict_functions import *
+from functions_for_stats import *
 
 import argparse
 import torch
@@ -16,20 +18,21 @@ import scipy.io
 
 from torch import nn, optim
 from torch.nn import functional as F
+from scripts.functions_for_texts import *
 
 from etm import ETM
 from utils import nearest_neighbors, get_topic_coherence, get_topic_diversity
 
 parser = argparse.ArgumentParser(description='The Embedded Topic Model')
 
-### data and file related arguments
+# data and file related arguments
 parser.add_argument('--dataset', type=str, default='20ng', help='name of corpus')
 parser.add_argument('--data_path', type=str, default='data/20ng', help='directory containing data')
-parser.add_argument('--emb_path', type=str, default='data/20ng_embeddings.txt', help='directory containing word embeddings')
+parser.add_argument('--emb_path', type=str, default='C:/Users/Dorothea/PycharmProjects/Cluster-Analysis/Embeddings/FastText/cc.el.300.vec', help='directory containing word embeddings')
 parser.add_argument('--save_path', type=str, default='./results', help='path to save results')
 parser.add_argument('--batch_size', type=int, default=1000, help='input batch size for training')
 
-### model-related arguments
+# model-related arguments
 parser.add_argument('--num_topics', type=int, default=50, help='number of topics')
 parser.add_argument('--rho_size', type=int, default=300, help='dimension of rho')
 parser.add_argument('--emb_size', type=int, default=300, help='dimension of embeddings')
@@ -37,7 +40,7 @@ parser.add_argument('--t_hidden_size', type=int, default=800, help='dimension of
 parser.add_argument('--theta_act', type=str, default='relu', help='tanh, softplus, relu, rrelu, leakyrelu, elu, selu, glu)')
 parser.add_argument('--train_embeddings', type=int, default=0, help='whether to fix rho or train it')
 
-### optimization-related arguments
+# optimization-related arguments
 parser.add_argument('--lr', type=float, default=0.005, help='learning rate')
 parser.add_argument('--lr_factor', type=float, default=4.0, help='divide learning rate by this...')
 parser.add_argument('--epochs', type=int, default=20, help='number of epochs to train...150 for 20ng 100 for others')
@@ -51,7 +54,7 @@ parser.add_argument('--wdecay', type=float, default=1.2e-6, help='some l2 regula
 parser.add_argument('--anneal_lr', type=int, default=0, help='whether to anneal the learning rate or not')
 parser.add_argument('--bow_norm', type=int, default=1, help='normalize the bows or not')
 
-### evaluation, visualization, and logging-related arguments
+# evaluation, visualization, and logging-related arguments
 parser.add_argument('--num_words', type=int, default=10, help='number of words for topic viz')
 parser.add_argument('--log_interval', type=int, default=2, help='when to log training')
 parser.add_argument('--visualize_every', type=int, default=10, help='when to visualize results')
@@ -70,7 +73,7 @@ torch.manual_seed(args.seed)
 if torch.cuda.is_available():
     torch.cuda.manual_seed(args.seed)
 
-## get data
+# get data
 # 1. vocabulary
 vocab, train, valid, test = data.get_data(os.path.join(args.data_path))
 vocab_size = len(vocab)
@@ -100,13 +103,13 @@ args.num_docs_test_2 = len(test_2_tokens)
 embeddings = None
 if not args.train_embeddings:
     emb_path = args.emb_path
-    vect_path = os.path.join(args.data_path.split('/')[0], 'embeddings.pkl')   
+    #vect_path = os.path.join(args.data_path.split('/')[0], 'embeddings.pkl')
     vectors = {}
     with open(emb_path, 'rb') as f:
         for l in f:
             line = l.decode().split()
             word = line[0]
-            if word in vocab:
+            if strip_accents_and_lowercase(word) in vocab:
                 vect = np.array(line[1:]).astype(np.float)
                 vectors[word] = vect
     embeddings = np.zeros((vocab_size, args.emb_size))
@@ -156,6 +159,7 @@ else:
     print('Defaulting to vanilla SGD')
     optimizer = optim.SGD(model.parameters(), lr=args.lr)
 
+
 def train(epoch):
     model.train()
     acc_loss = 0
@@ -200,14 +204,16 @@ def train(epoch):
             epoch, optimizer.param_groups[0]['lr'], cur_kl_theta, cur_loss, cur_real_loss))
     print('*'*100)
 
+
 def visualize(m, show_emb=True):
     if not os.path.exists('./results'):
         os.makedirs('./results')
 
     m.eval()
 
-    queries = ['andrew', 'computer', 'sports', 'religion', 'man', 'love', 
-                'intelligence', 'money', 'politics', 'health', 'people', 'family']
+    queries = []
+    # queries = ['andrew', 'computer', 'sports', 'religion', 'man', 'love',
+    #             'intelligence', 'money', 'politics', 'health', 'people', 'family']
 
     ## visualize topics using monte carlo
     with torch.no_grad():
@@ -235,6 +241,7 @@ def visualize(m, show_emb=True):
                 print('word: {} .. neighbors: {}'.format(
                     word, nearest_neighbors(word, embeddings, vocab)))
             print('#'*100)
+
 
 def evaluate(m, source, tc=False, td=False):
     """Compute perplexity on document completion.
@@ -293,6 +300,7 @@ def evaluate(m, source, tc=False, td=False):
                 get_topic_diversity(beta, 25)
         return ppl_dc
 
+
 if args.mode == 'train':
     ## train model on data 
     best_epoch = 0
@@ -329,6 +337,7 @@ else:
     model.eval()
 
     with torch.no_grad():
+        print("-----------------------YES-----------------------------")
         ## get document completion perplexities
         test_ppl = evaluate(model, 'test', tc=args.tc, td=args.td)
 
@@ -371,10 +380,61 @@ else:
                 rho_etm = model.rho.weight.cpu()
             except:
                 rho_etm = model.rho.cpu()
-            queries = ['andrew', 'woman', 'computer', 'sports', 'religion', 'man', 'love', 
-                            'intelligence', 'money', 'politics', 'health', 'people', 'family']
+            # queries = ['andrew', 'woman', 'computer', 'sports', 'religion', 'man', 'love',
+            #                'intelligence', 'money', 'politics', 'health', 'people', 'family']
+            queries = []
             print('\n')
             print('ETM embeddings...')
             for word in queries:
                 print('word: {} .. etm neighbors: {}'.format(word, nearest_neighbors(word, rho_etm, vocab)))
             print('\n')
+
+            indices = torch.tensor(range(args.num_docs_test))
+            indices = torch.split(indices, 1)
+            topics = []
+            for idx, ind in enumerate(indices):
+                print(idx, ind)
+                data_batch = data.get_batch(test_tokens, test_counts, ind, args.vocab_size, device)
+                topic = predict(data_batch, args.num_topics, model)
+                topics.append(topic)
+            print(topics)
+
+            #keys_list = ["Υγεία", "Ψυχαγωγία", "Υγεία", "Κόσμος", "Υγεία", "Υγεία", "Επιχείρηση", "Ελλάδα", "Ψυχαγωγία",
+            #             "Ελλάδα", "Τεχνολογία", "Σπορ"]
+
+            '''
+                12 topics without preprocessing
+                keys_list = ["Υγεία", "Ψυχαγωγία", "Σπορ", "Ελλάδα", "Σπορ", "Υγεία", "Ελλάδα", "Υγεία", "Κόσμος",
+                             "Ελλάδα", "Επιχείρηση", "Ελλάδα"]
+            '''
+            cluster_list = [i for i in range(0, 40)]
+            # preprocess 12 topics
+            #keys_list = ["Τεχνολογία", "Ψυχαγωγία", "Υγεία", "Κόσμος", "Ελλάδα", "Σπορ", "Ελλάδα", "Σπορ", "Υγεία",
+            #             "Ελλάδα", "Ελλάδα", "Ελλάδα"]
+            keys_list = ['Κόσμος', 'Επιχείρηση', 'Ελλάδα', 'Ελλάδα', 'Ελλάδα', 'Ελλάδα', 'Ελλάδα', 'Σπορ', 'Σπορ',
+                         'Ελλάδα', 'Υγεία', 'Τεχνολογία', 'Ψυχαγωγία', 'Ελλάδα', 'Υγεία', 'Ελλάδα', 'Ελλάδα',
+                         'Ψυχαγωγία', 'Ελλάδα', 'Υγεία', 'Ελλάδα', 'Ψυχαγωγία', 'Σπορ', 'Ψυχαγωγία', 'Κόσμος',
+                         'Ελλάδα', 'Σπορ', 'Υγεία', 'Ψυχαγωγία', 'Υγεία', 'Υγεία', 'Ψυχαγωγία', 'Ελλάδα',
+                         'Ελλάδα', 'Ελλάδα', 'Ελλάδα', 'Ελλάδα', 'Επιχείρηση', 'Κόσμος', 'Ψυχαγωγία']
+
+
+            df_docs = pd.read_excel("C:/Users/Dorothea/PycharmProjects/Diploma_Thesis/Dataset/Articles.xlsx")
+            df = pd.DataFrame()
+            df["Categories"] = df_docs.iloc[0:, 6]
+            df["IDs"] = df_docs.iloc[0:, 1]
+            df["Tags"] = df_docs.iloc[0:, 7]
+            ids_dict = category_frequency(df, "Yes")
+
+            file = open("scripts/article_ids.txt")
+            lines = file.readlines()
+            ids = []
+            for i in lines[354:395]:
+                ids.append(i.split(",")[0])
+            file.close()
+
+            df = pd.DataFrame()
+            df["Ids"] = ids
+            df["Clusters"] = topics
+            accuracy_for_clusters(df, keys_list, cluster_list, ids_dict)
+
+

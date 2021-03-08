@@ -31,6 +31,7 @@ def _fetch(path, name):
                         'tokens_2': tokens_2, 'counts_2': counts_2}
     return {'tokens': tokens, 'counts': counts}
 
+
 def get_data(path):
     with open(os.path.join(path, 'vocab.pkl'), 'rb') as f:
         vocab = pickle.load(f)
@@ -40,6 +41,7 @@ def get_data(path):
     test = _fetch(path, 'test')
 
     return vocab, train, valid, test
+
 
 def get_batch(tokens, counts, ind, vocab_size, device, emsize=300):
     """fetch input data by batch."""

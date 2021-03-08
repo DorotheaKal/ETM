@@ -7,6 +7,7 @@ from torch import nn
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
 class ETM(nn.Module):
     def __init__(self, num_topics, vocab_size, t_hidden_size, rho_size, emsize, 
                     theta_act, embeddings=None, train_embeddings=True, enc_drop=0.5):
@@ -23,7 +24,7 @@ class ETM(nn.Module):
 
         self.theta_act = self.get_activation(theta_act)
         
-        ## define the word embedding matrix \rho
+        # define the word embedding matrix \rho
         if train_embeddings:
             self.rho = nn.Linear(rho_size, vocab_size, bias=False)
         else:
@@ -31,10 +32,10 @@ class ETM(nn.Module):
             rho = nn.Embedding(num_embeddings, emsize)
             self.rho = embeddings.clone().float().to(device)
 
-        ## define the matrix containing the topic embeddings
-        self.alphas = nn.Linear(rho_size, num_topics, bias=False)#nn.Parameter(torch.randn(rho_size, num_topics))
+        # define the matrix containing the topic embeddings
+        self.alphas = nn.Linear(rho_size, num_topics, bias=False)# nn.Parameter(torch.randn(rho_size, num_topics))
     
-        ## define variational distribution for \theta_{1:D} via amortizartion
+        # define variational distribution for \theta_{1:D} via amortizartion
         self.q_theta = nn.Sequential(
                 nn.Linear(vocab_size, t_hidden_size), 
                 self.theta_act,
